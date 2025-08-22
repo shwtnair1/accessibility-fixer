@@ -18,6 +18,7 @@ export default function HomePage() {
 	const [log, setLog] = useState<LogItem[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [refining, setRefining] = useState<Record<number, boolean>>({});
 
 	const handleFix = useCallback(async () => {
 		setLoading(true);
@@ -46,11 +47,11 @@ export default function HomePage() {
 	const hasResults = useMemo(() => (fixed.length > 0 || log.length > 0), [fixed, log]);
 
 	const groupedLog = useMemo(() => {
-		const groups: Record<string, LogItem[]> = {};
-		for (const item of log) {
+		const groups: Record<string, (LogItem & { index: number })[]> = {};
+		log.forEach((item, index) => {
 			if (!groups[item.category]) groups[item.category] = [];
-			groups[item.category].push(item);
-		}
+			groups[item.category].push({ ...item, index });
+		});
 		return groups;
 	}, [log]);
 
@@ -60,6 +61,47 @@ export default function HomePage() {
 			alert("Copied fixed code to clipboard");
 		} catch {
 			alert("Failed to copy");
+		}
+	}, [edited]);
+
+	const canRefine = (action: string) => {
+		return action === "img-missing-alt" || action === "anchor-no-text" || action === "button-only-svg" || action === "input-missing-label";
+	};
+
+	const refineWithAI = useCallback(async (item: LogItem, idx: number) => {
+		setRefining((r) => ({ ...r, [idx]: true }));
+		try {
+			const payload: any = {
+				filename: "snippet",
+				context: `${item.selector}\n${edited}`,
+				currentAlt: item.action === "img-missing-alt" ? "" : null,
+			};
+			const res = await fetch("/api/ai", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify(payload),
+			});
+			const data = await res.json();
+			if (!res.ok || data?.error) throw new Error(data?.error || `AI request failed`);
+			let next = edited;
+			if (item.action === "img-missing-alt" && data.alt) {
+				next = replaceFirst(next, /alt=""/, `alt="${escapeQuotes(data.alt)}"`);
+			}
+			if (item.action === "anchor-no-text" && data.linkText) {
+				next = replaceFirst(next, /aria-label="Link"/, `aria-label="${escapeQuotes(data.linkText)}"`);
+			}
+			if (item.action === "button-only-svg" && data.linkText) {
+				next = replaceFirst(next, /aria-label="Button"/, `aria-label="${escapeQuotes(data.linkText)}"`);
+			}
+			if (item.action === "input-missing-label" && (data.linkText || data.alt)) {
+				const val = data.linkText || data.alt;
+				next = replaceFirst(next, /aria-label="Input"/, `aria-label="${escapeQuotes(val)}"`);
+			}
+			setEdited(next);
+		} catch (e: any) {
+			alert(e?.message || "AI refine failed");
+		} finally {
+			setRefining((r) => ({ ...r, [idx]: false }));
 		}
 	}, [edited]);
 
@@ -139,10 +181,21 @@ export default function HomePage() {
 												<div key={category} className="rounded border">
 													<div className="border-b bg-gray-50 px-3 py-2 text-sm font-medium">{category}</div>
 													<ul className="p-2 space-y-2 text-sm">
-														{groupedLog[category].map((item, idx) => (
-															<li key={idx}>
-																<p className="text-gray-700">{item.summary}</p>
-																<p className="text-[11px] text-gray-500">{item.selector}</p>
+														{groupedLog[category].map((item) => (
+															<li key={item.index} className="flex items-start justify-between gap-3">
+																<div>
+																	<p className="text-gray-700">{item.summary}</p>
+																	<p className="text-[11px] text-gray-500">{item.selector}</p>
+																</div>
+																{canRefine(item.action) && (
+																	<button
+																		onClick={() => refineWithAI(item, item.index)}
+																		disabled={!!refining[item.index]}
+																		className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-50"
+																	>
+																	{refining[item.index] ? "Refining..." : "Refine with AI"}
+																	</button>
+																)}
 															</li>
 														))}
 													</ul>
@@ -158,4 +211,14 @@ export default function HomePage() {
 			</div>
 		</main>
 	);
+}
+
+function replaceFirst(source: string, pattern: RegExp, replacement: string): string {
+	const m = source.match(pattern);
+	if (!m) return source;
+	return source.replace(pattern, replacement);
+}
+
+function escapeQuotes(s: string): string {
+	return s.replace(/"/g, "\\\"");
 }
