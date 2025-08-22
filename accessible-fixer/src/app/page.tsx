@@ -143,7 +143,7 @@ export default function HomePage() {
 								type="button"
 								disabled={loading}
 								onClick={handleFix}
-								className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white shadow hover:bg-blue-700 active:scale-[.99] focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition"
+								className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white shadow-md hover:bg-blue-500 hover:shadow-lg active:scale-[.99] focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition"
 								aria-controls="results"
 							>
 								{loading ? "Fixing..." : "Fix Accessibility"}
@@ -152,20 +152,20 @@ export default function HomePage() {
 					</section>
 					<section aria-labelledby="results-label" className="flex min-h-0 flex-col">
 						<h2 id="results-label" className="mb-2 text-sm font-medium text-gray-700">Results</h2>
-						<div id="results" className="flex-1 min-h-0 w-full rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-sm">
+						<div id="results" className="flex-1 min-h-0 w-full rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-md">
 							{error && <p className="text-red-600">{error}</p>}
 							{!hasResults && !error && <p className="text-gray-500">No results yet.</p>}
 							{hasResults && (
 								<Tabs.Root defaultValue="diff" className="flex h-full flex-col">
 									<Tabs.List className="mb-3 inline-flex rounded-md border bg-gray-50 p-1 text-sm shadow-sm">
-										<Tabs.Trigger value="diff" className="px-3 py-1.5 rounded transition data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-slate-900 text-slate-600 hover:text-slate-900">Diff</Tabs.Trigger>
-										<Tabs.Trigger value="code" className="px-3 py-1.5 rounded transition data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-slate-900 text-slate-600 hover:text-slate-900">Fixed Code</Tabs.Trigger>
-										<Tabs.Trigger value="log" className="px-3 py-1.5 rounded transition data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-slate-900 text-slate-600 hover:text-slate-900">Change Log</Tabs.Trigger>
+										<Tabs.Trigger value="diff" className="px-3 py-1.5 rounded transition-colors data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-slate-900 text-slate-600 hover:text-slate-900">Diff</Tabs.Trigger>
+										<Tabs.Trigger value="code" className="px-3 py-1.5 rounded transition-colors data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-slate-900 text-slate-600 hover:text-slate-900">Fixed Code</Tabs.Trigger>
+										<Tabs.Trigger value="log" className="px-3 py-1.5 rounded transition-colors data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-slate-900 text-slate-600 hover:text-slate-900">Change Log</Tabs.Trigger>
 									</Tabs.List>
 
 									<div className="flex-1 min-h-0">
-										<Tabs.Content value="diff" className="h-full outline-none">
-											<div className="h-full rounded-lg border border-slate-200 bg-white shadow-sm overflow-auto">
+										<Tabs.Content value="diff" className="h-full outline-none transition-opacity data-[state=inactive]:opacity-0 data-[state=active]:opacity-100">
+											<div className="h-full rounded-lg border border-slate-200 bg-slate-900 text-slate-100 shadow-md overflow-auto">
 												<ReactDiffViewer
 													oldValue={input}
 													newValue={fixed}
@@ -176,12 +176,12 @@ export default function HomePage() {
 											</div>
 										</Tabs.Content>
 
-										<Tabs.Content value="code" className="h-full outline-none">
+										<Tabs.Content value="code" className="h-full outline-none transition-opacity data-[state=inactive]:opacity-0 data-[state=active]:opacity-100">
 											<div className="mb-2 flex items-center justify-between">
 												<h3 className="font-medium">Fixed Code (Editable)</h3>
-												<button onClick={copyFixed} className="rounded border px-2 py-1 text-xs hover:bg-gray-50 active:scale-[.99] transition">Copy</button>
+												<button onClick={copyFixed} className="rounded border px-2 py-1 text-xs hover:bg-gray-50 hover:shadow active:scale-[.99] transition">Copy</button>
 											</div>
-											<div className="h-[calc(100%-40px)] rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+											<div className="h-[calc(100%-40px)] rounded-lg border border-slate-800 bg-slate-900 text-slate-100 shadow-md overflow-hidden">
 												<MonacoEditor
 													height="100%"
 													defaultLanguage="html"
@@ -193,7 +193,7 @@ export default function HomePage() {
 											</div>
 										</Tabs.Content>
 
-										<Tabs.Content value="log" className="h-full outline-none">
+										<Tabs.Content value="log" className="h-full outline-none transition-opacity data-[state=inactive]:opacity-0 data-[state=active]:opacity-100">
 											<div className="h-full overflow-auto space-y-4">
 												{Object.keys(groupedLog).map((category) => (
 													<div key={category}>
@@ -203,7 +203,7 @@ export default function HomePage() {
 														</div>
 														<div className="grid grid-cols-1 gap-3">
 															{groupedLog[category].map((item) => (
-																<div key={item.index} className="rounded-lg border border-slate-200 bg-white shadow-sm p-3">
+																<div key={item.index} className="rounded-lg border border-slate-200 bg-white shadow-md p-3">
 																	<div className="mb-1 flex items-center justify-between">
 																		<span className="text-xs text-slate-500">{item.category}</span>
 																		<span className={badgeClassesForAction(item.action)}>{item.action === "suggest" ? "Suggested" : item.action === "update" ? "Updated" : "Fixed"}</span>
@@ -216,7 +216,7 @@ export default function HomePage() {
 																			<button
 																				onClick={() => refineWithAI(item, item.index)}
 																				disabled={!!refining[item.index]}
-																				className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-gray-50 active:scale-[.99] disabled:opacity-50 transition"
+																				className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-gray-50 hover:shadow active:scale-[.99] disabled:opacity-50 transition"
 																			>
 																				{refining[item.index] ? "Refining..." : "Refine with AI"}
 																			</button>
@@ -226,10 +226,10 @@ export default function HomePage() {
 															))}
 														</div>
 													</div>
-												))}
-											</div>
-										</Tabs.Content>
-									</div>
+											))}
+										</div>
+									</Tabs.Content>
+								</div>
 								</Tabs.Root>
 							)}
 						</div>
