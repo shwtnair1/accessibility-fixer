@@ -1,251 +1,374 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import dynamic from "next/dynamic";
-import * as Tabs from "@radix-ui/react-tabs";
+import { useState, useCallback, useMemo } from "react";
+import Header from "@/components/Header";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Copy, Download, Sparkles, CheckCircle, AlertCircle } from "lucide-react";
 
-const ReactDiffViewer = dynamic(() => import("react-diff-viewer-continued"), { ssr: false });
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
+type LogItem = { 
+  category: string; 
+  action: string; 
+  selector: string; 
+  summary: string;
+  index?: number;
+};
 
-type LogItem = { category: string; action: string; selector: string; summary: string };
+type FixResult = {
+  code: string;
+  log: LogItem[];
+  hasChanges?: boolean;
+  fixes?: LogItem[];
+};
 
-type FixResponse = { code: string; log: LogItem[] } | { error: string };
+const Index = () => {
+  const [sourceCode, setSourceCode] = useState('<button><svg/></button>\n<img src="/x.png"/>\n<a href="#"></a>\n<div onClick={() => {}}/>\n<input />');
+  const [result, setResult] = useState<FixResult | null>(null);
+  const [editedCode, setEditedCode] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [refining, setRefining] = useState<Record<number, boolean>>({});
 
-function badgeClassesForAction(action: string): string {
-	const base = "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px]";
-	if (action === "add" || action.includes("missing") || action.includes("only") || action.includes("clickable")) {
-		return `${base} bg-green-50 text-green-700 border-green-200`;
-	}
-	if (action === "suggest" || action.includes("suggest")) {
-		return `${base} bg-yellow-50 text-yellow-800 border-yellow-200`;
-	}
-	if (action === "update" || action.includes("update")) {
-		return `${base} bg-blue-50 text-blue-700 border-blue-200`;
-	}
-	return `${base} bg-slate-100 text-slate-700 border-slate-200`;
-}
+  const handleAnalyze = useCallback(async () => {
+    if (!sourceCode.trim()) {
+      alert("Please paste some JSX or HTML code to analyze");
+      return;
+    }
 
-export default function HomePage() {
-	const [input, setInput] = useState<string>("<button><svg/></button>\n<img src=\"/x.png\"/>\n<a href=\"#\"></a>\n<div onClick={() => {}}/>\n<input />");
-	const [fixed, setFixed] = useState<string>("");
-	const [edited, setEdited] = useState<string>("");
-	const [log, setLog] = useState<LogItem[]>([]);
-	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [refining, setRefining] = useState<Record<number, boolean>>({});
+    setIsAnalyzing(true);
+    
+    try {
+      const res = await fetch("/api/fix", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: sourceCode }),
+      });
+      
+      if (!res.ok) {
+        throw new Error(`Request failed with ${res.status}`);
+      }
+      
+      const data = await res.json();
+      const fixResult: FixResult = {
+        code: data.code || sourceCode,
+        log: data.log || [],
+        hasChanges: (data.log || []).length > 0,
+        fixes: data.log || []
+      };
+      
+      setResult(fixResult);
+      setEditedCode(fixResult.code || sourceCode);
+      
+      if (fixResult.hasChanges && fixResult.fixes) {
+        console.log(`Found and fixed ${fixResult.fixes.length} accessibility ${fixResult.fixes.length === 1 ? 'issue' : 'issues'}`);
+      } else {
+        console.log("No accessibility issues detected in your code");
+      }
+    } catch (error) {
+      console.error('Analysis error:', error);
+      alert("An error occurred while analyzing your code");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [sourceCode]);
 
-	const handleFix = useCallback(async () => {
-		setLoading(true);
-		setError(null);
-		try {
-			const res = await fetch("/api/fix", {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ code: input }),
-			});
-			const data: FixResponse = await res.json();
-			if (!res.ok || "error" in data) {
-				throw new Error((data as any).error || `Request failed with ${res.status}`);
-			}
-			const out = (data as any).code || "";
-			setFixed(out);
-			setEdited(out);
-			setLog((data as any).log || []);
-		} catch (e: any) {
-			setError(e?.message || "Unknown error");
-		} finally {
-			setLoading(false);
-		}
-	}, [input]);
+  const copyToClipboard = useCallback(async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      console.log(`${label} copied to clipboard`);
+    } catch (error) {
+      console.error("Unable to copy to clipboard");
+    }
+  }, []);
 
-	const hasResults = useMemo(() => (fixed.length > 0 || log.length > 0), [fixed, log]);
+  const downloadCode = useCallback(() => {
+    const blob = new Blob([editedCode], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'fixed-code.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log("Fixed code saved to your device");
+  }, [editedCode]);
 
-	const groupedLog = useMemo(() => {
-		const groups: Record<string, (LogItem & { index: number })[]> = {};
-		log.forEach((item, index) => {
-			if (!groups[item.category]) groups[item.category] = [];
-			groups[item.category].push({ ...item, index });
-		});
-		return groups;
-	}, [log]);
+  const getBadgeVariant = (action: string) => {
+    if (action === "add" || action.includes("missing") || action.includes("only") || action.includes("clickable")) {
+      return "default";
+    }
+    if (action === "suggest" || action.includes("suggest")) {
+      return "secondary";
+    }
+    if (action === "update" || action.includes("update")) {
+      return "outline";
+    }
+    return "secondary";
+  };
 
-	const copyFixed = useCallback(async () => {
-		try {
-			await navigator.clipboard.writeText(edited);
-			alert("Copied fixed code to clipboard");
-		} catch {
-			alert("Failed to copy");
-		}
-	}, [edited]);
+  const groupedLog = useMemo(() => {
+    if (!result?.fixes) return {};
+    
+    const groups: Record<string, LogItem[]> = {};
+    result.fixes.forEach((fix, index) => {
+      const category = fix.category || 'General';
+      if (!groups[category]) groups[category] = [];
+      groups[category].push({
+        category,
+        action: fix.action || 'fix',
+        selector: fix.selector || '',
+        summary: fix.summary || '',
+        index
+      });
+    });
+    return groups;
+  }, [result]);
 
-	const canRefine = (action: string) => {
-		return action === "img-missing-alt" || action === "anchor-no-text" || action === "button-only-svg" || action === "input-missing-label";
-	};
+  const hasResults = useMemo(() => Boolean(result && (result.code || (result.fixes && result.fixes.length > 0))), [result]);
 
-	const refineWithAI = useCallback(async (item: LogItem, idx: number) => {
-		setRefining((r) => ({ ...r, [idx]: true }));
-		try {
-			const payload: any = {
-				filename: "snippet",
-				context: `${item.selector}\n${edited}`,
-				currentAlt: item.action === "img-missing-alt" ? "" : null,
-			};
-			const res = await fetch("/api/ai", {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify(payload),
-			});
-			const data = await res.json();
-			if (!res.ok || data?.error) throw new Error(data?.error || `AI request failed`);
-			let next = edited;
-			if (item.action === "img-missing-alt" && data.alt) {
-				next = replaceFirst(next, /alt=""/, `alt="${escapeQuotes(data.alt)}"`);
-			}
-			if (item.action === "anchor-no-text" && data.linkText) {
-				next = replaceFirst(next, /aria-label="Link"/, `aria-label="${escapeQuotes(data.linkText)}"`);
-			}
-			if (item.action === "button-only-svg" && data.linkText) {
-				next = replaceFirst(next, /aria-label="Button"/, `aria-label="${escapeQuotes(data.linkText)}"`);
-			}
-			if (item.action === "input-missing-label" && (data.linkText || data.alt)) {
-				const val = data.linkText || data.alt;
-				next = replaceFirst(next, /aria-label="Input"/, `aria-label="${escapeQuotes(val)}"`);
-			}
-			setEdited(next);
-		} catch (e: any) {
-			alert(e?.message || "AI refine failed");
-		} finally {
-			setRefining((r) => ({ ...r, [idx]: false }));
-		}
-	}, [edited]);
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <Header />
+      
+      <main className="flex-1 container mx-auto p-6 space-y-6">
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+            Accessibility Fixer
+          </h1>
+          <p className="text-muted-foreground">
+            Transform your JSX/HTML into accessible, inclusive code automatically
+          </p>
+        </div>
 
-	return (
-		<main className="min-h-screen bg-slate-50">
-			<div className="mx-auto max-w-6xl px-6 py-4">
-				<h1 className="text-xl md:text-2xl font-semibold mb-4">Accessibility Fixer</h1>
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6" style={{ minHeight: "calc(100vh - 90px)" }}>
-					<section aria-labelledby="input-label" className="flex min-h-0 flex-col">
-						<h2 id="input-label" className="sr-only">Input</h2>
-						<label htmlFor="snippet" className="mb-2 text-sm font-medium text-gray-700">JSX/HTML Snippet</label>
-						<div className="flex-1 min-h-0">
-							<textarea
-								id="snippet"
-								className="h-full w-full rounded-lg border border-slate-800 bg-slate-900 text-slate-100 caret-white shadow-sm p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 placeholder:text-slate-400 transition focus:shadow-md"
-								placeholder="Paste JSX or HTML here..."
-								value={input}
-								onChange={(e) => setInput(e.target.value)}
-								aria-describedby="snippet-help"
-							/>
-						</div>
-						<p id="snippet-help" className="mt-2 text-xs text-gray-500">Paste your JSX/HTML snippet. We will analyze and suggest accessibility fixes.</p>
-						<div className="mt-3">
-							<button
-								type="button"
-								disabled={loading}
-								onClick={handleFix}
-								className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white shadow-md hover:bg-blue-500 hover:shadow-lg active:scale-[.99] focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition"
-								aria-controls="results"
-							>
-								{loading ? "Fixing..." : "Fix Accessibility"}
-							</button>
-						</div>
-					</section>
-					<section aria-labelledby="results-label" className="flex min-h-0 flex-col">
-						<h2 id="results-label" className="mb-2 text-sm font-medium text-gray-700">Results</h2>
-						<div id="results" className="flex-1 min-h-0 w-full rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-md">
-							{error && <p className="text-red-600">{error}</p>}
-							{!hasResults && !error && <p className="text-gray-500">No results yet.</p>}
-							{hasResults && (
-								<Tabs.Root defaultValue="diff" className="flex h-full flex-col">
-									<Tabs.List className="mb-3 inline-flex rounded-md border bg-gray-50 p-1 text-sm shadow-sm">
-										<Tabs.Trigger value="diff" className="px-3 py-1.5 rounded transition-colors data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-slate-900 text-slate-600 hover:text-slate-900">Diff</Tabs.Trigger>
-										<Tabs.Trigger value="code" className="px-3 py-1.5 rounded transition-colors data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-slate-900 text-slate-600 hover:text-slate-900">Fixed Code</Tabs.Trigger>
-										<Tabs.Trigger value="log" className="px-3 py-1.5 rounded transition-colors data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-slate-900 text-slate-600 hover:text-slate-900">Change Log</Tabs.Trigger>
-									</Tabs.List>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[600px]">
+          {/* Input Section */}
+          <Card className="flex flex-col shadow-elegant bg-card/50 backdrop-blur-sm border border-primary/10">
+            <div className="p-6 border-b border-border/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-primary"></div>
+                  <h2 className="font-semibold text-card-foreground">Input Code</h2>
+                </div>
+                <Badge variant="secondary" className="text-xs">
+                  JSX / HTML
+                </Badge>
+              </div>
+            </div>
+            
+            <div className="flex-1 p-6 space-y-4">
+              <div className="flex-1 min-h-[400px]">
+                <textarea
+                  className="w-full h-full min-h-[400px] p-4 rounded-lg border bg-code-background text-code-foreground font-mono text-sm placeholder:text-code-muted resize-none focus:outline-none focus:ring-2 focus:ring-ring transition-smooth custom-scroll"
+                  placeholder="Paste your JSX or HTML code here..."
+                  value={sourceCode}
+                  onChange={(e) => setSourceCode(e.target.value)}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-muted-foreground">
+                  {sourceCode.split('\n').length} lines • {sourceCode.length} characters
+                </div>
+                <Button 
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing || !sourceCode.trim()}
+                  className="transition-smooth"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Fix Accessibility
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </Card>
 
-									<div className="flex-1 min-h-0">
-										<Tabs.Content value="diff" className="h-full outline-none transition-opacity data-[state=inactive]:opacity-0 data-[state=active]:opacity-100">
-											<div className="h-full rounded-lg border border-slate-200 bg-slate-900 text-slate-100 shadow-md overflow-auto">
-												<ReactDiffViewer
-													oldValue={input}
-													newValue={fixed}
-													splitView={true}
-													leftTitle="Before"
-													rightTitle="After"
-												/>
-											</div>
-										</Tabs.Content>
+          {/* Results Section */}
+          <Card className="flex flex-col shadow-elegant bg-card/50 backdrop-blur-sm border border-primary/10">
+            <div className="p-6 border-b border-border/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-success"></div>
+                  <h2 className="font-semibold text-card-foreground">Results</h2>
+                  {result && result.hasChanges && result.fixes && (
+                    <Badge variant="default" className="text-xs">
+                      {result.fixes.length} {result.fixes.length === 1 ? 'Fix' : 'Fixes'}
+                    </Badge>
+                  )}
+                </div>
+                {hasResults && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyToClipboard(editedCode, "Fixed code")}
+                    >
+                      <Copy className="w-3 h-3 mr-1" />
+                      Copy
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={downloadCode}
+                    >
+                      <Download className="w-3 h-3 mr-1" />
+                      Download
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
 
-										<Tabs.Content value="code" className="h-full outline-none transition-opacity data-[state=inactive]:opacity-0 data-[state=active]:opacity-100">
-											<div className="mb-2 flex items-center justify-between">
-												<h3 className="font-medium">Fixed Code (Editable)</h3>
-												<button onClick={copyFixed} className="rounded border px-2 py-1 text-xs hover:bg-gray-50 hover:shadow active:scale-[.99] transition">Copy</button>
-											</div>
-											<div className="h-[calc(100%-40px)] rounded-lg border border-slate-800 bg-slate-900 text-slate-100 shadow-md overflow-hidden">
-												<MonacoEditor
-													height="100%"
-													defaultLanguage="html"
-													value={edited}
-													onChange={(v) => setEdited(v || "")}
-													theme="vs-dark"
-													options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: "on", smoothScrolling: true, scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 } }}
-												/>
-											</div>
-										</Tabs.Content>
+            <div className="flex-1 p-6">
+              {isAnalyzing ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center space-y-4">
+                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <div className="space-y-2">
+                      <p className="font-medium">Analyzing your code...</p>
+                      <p className="text-sm text-muted-foreground">Checking for accessibility issues</p>
+                    </div>
+                  </div>
+                </div>
+              ) : !hasResults ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center space-y-4">
+                    <div className="w-16 h-16 rounded-full bg-muted/20 flex items-center justify-center mx-auto">
+                      <AlertCircle className="w-8 h-8 text-muted-foreground" />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="font-medium">Ready to analyze</p>
+                      <p className="text-sm text-muted-foreground">Paste your code and click "Fix Accessibility"</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Tabs defaultValue="overview" className="flex flex-col h-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="code">Fixed Code</TabsTrigger>
+                    <TabsTrigger value="changes">Changes</TabsTrigger>
+                  </TabsList>
 
-										<Tabs.Content value="log" className="h-full outline-none transition-opacity data-[state=inactive]:opacity-0 data-[state=active]:opacity-100">
-											<div className="h-full overflow-auto space-y-4">
-												{Object.keys(groupedLog).map((category) => (
-													<div key={category}>
-														<div className="mb-2 flex items-center gap-2">
-															<h3 className="text-sm font-medium text-slate-700">{category}</h3>
-															<span className={badgeClassesForAction("add")}>Fixed</span>
-														</div>
-														<div className="grid grid-cols-1 gap-3">
-															{groupedLog[category].map((item) => (
-																<div key={item.index} className="rounded-lg border border-slate-200 bg-white shadow-md p-3">
-																	<div className="mb-1 flex items-center justify-between">
-																		<span className="text-xs text-slate-500">{item.category}</span>
-																		<span className={badgeClassesForAction(item.action)}>{item.action === "suggest" ? "Suggested" : item.action === "update" ? "Updated" : "Fixed"}</span>
-																	</div>
-																	<p className="text-slate-800">{item.summary}</p>
-																	<p className="text-[11px] text-slate-500 mt-1">{item.selector}</p>
-																	{canRefine(item.action) && (
-																		<div className="mt-2 flex items-center gap-2">
-																			<span className={badgeClassesForAction("suggest")}>Suggested</span>
-																			<button
-																				onClick={() => refineWithAI(item, item.index)}
-																				disabled={!!refining[item.index]}
-																				className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-gray-50 hover:shadow active:scale-[.99] disabled:opacity-50 transition"
-																			>
-																				{refining[item.index] ? "Refining..." : "Refine with AI"}
-																			</button>
-																		</div>
-																	)}
-																</div>
-															))}
-														</div>
-													</div>
-											))}
-										</div>
-									</Tabs.Content>
-								</div>
-								</Tabs.Root>
-							)}
-						</div>
-					</section>
-				</div>
-			</div>
-		</main>
-	);
-}
+                  <TabsContent value="overview" className="flex-1 mt-4 space-y-4">
+                    {result && result.hasChanges && result.fixes ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 p-4 rounded-lg bg-success/10 border border-success/20">
+                          <CheckCircle className="w-5 h-5 text-success" />
+                          <div>
+                            <p className="font-medium text-success">Great! Found {result.fixes.length} accessibility {result.fixes.length === 1 ? 'issue' : 'issues'}</p>
+                            <p className="text-sm text-success/80">Your code has been automatically fixed</p>
+                          </div>
+                        </div>
 
-function replaceFirst(source: string, pattern: RegExp, replacement: string): string {
-	const m = source.match(pattern);
-	if (!m) return source;
-	return source.replace(pattern, replacement);
-}
+                        <div className="space-y-3">
+                          {Object.entries(groupedLog).map(([category, items]) => (
+                            <div key={category} className="space-y-2">
+                              <h3 className="font-medium text-sm text-foreground">{category}</h3>
+                              <div className="space-y-2">
+                                {items.map((item, idx) => (
+                                  <div key={idx} className="p-3 rounded-lg border bg-card/50 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <Badge variant={getBadgeVariant(item.action)} className="text-xs">
+                                        {item.action}
+                                      </Badge>
+                                      <span className="text-xs text-muted-foreground font-mono">
+                                        {item.selector}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-foreground">{item.summary}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 p-4 rounded-lg bg-success/10 border border-success/20">
+                        <CheckCircle className="w-5 h-5 text-success" />
+                        <div>
+                          <p className="font-medium text-success">Perfect! No accessibility issues found</p>
+                          <p className="text-sm text-success/80">Your code follows accessibility best practices</p>
+                        </div>
+                      </div>
+                    )}
+                  </TabsContent>
 
-function escapeQuotes(s: string): string {
-	return s.replace(/"/g, "\\\"");
-}
+                  <TabsContent value="code" className="flex-1 mt-4">
+                    <div className="h-[400px] rounded-lg border bg-code-background">
+                      <textarea
+                        className="w-full h-full p-4 bg-transparent text-code-foreground font-mono text-sm resize-none focus:outline-none custom-scroll"
+                        value={editedCode}
+                        onChange={(e) => setEditedCode(e.target.value)}
+                        readOnly={false}
+                      />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="changes" className="flex-1 mt-4">
+                    <div className="h-[400px] rounded-lg border bg-code-background overflow-auto custom-scroll">
+                      <div className="p-4 space-y-2 text-sm font-mono">
+                        {sourceCode.split('\n').map((line, idx) => {
+                          const fixedLine = editedCode.split('\n')[idx] || '';
+                          const isChanged = line !== fixedLine;
+                          
+                          return (
+                            <div key={idx} className="grid grid-cols-2 gap-4">
+                              <div className={`p-2 rounded ${isChanged ? 'bg-destructive/10 text-destructive' : 'text-code-muted'}`}>
+                                <span className="text-xs text-muted-foreground mr-2">{idx + 1}</span>
+                                {line || ' '}
+                              </div>
+                              <div className={`p-2 rounded ${isChanged ? 'bg-success/10 text-success' : 'text-code-muted'}`}>
+                                <span className="text-xs text-muted-foreground mr-2">{idx + 1}</span>
+                                {fixedLine || ' '}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        {/* Enhanced Footer */}
+        <div className="text-center space-y-4 pt-8 border-t border-border/50">
+          <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-success" />
+              <span>Automated fixes</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span>WCAG compliant</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-warning" />
+              <span>Best practices</span>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Built for frontend developers who care about accessibility. 
+            <span className="text-primary ml-1 font-medium">Make the web accessible for everyone.</span>
+          </p>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default Index;
