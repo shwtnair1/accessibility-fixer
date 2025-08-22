@@ -11,6 +11,20 @@ type LogItem = { category: string; action: string; selector: string; summary: st
 
 type FixResponse = { code: string; log: LogItem[] } | { error: string };
 
+function badgeClassesForAction(action: string): string {
+	const base = "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px]";
+	if (action === "add" || action.includes("missing") || action.includes("only") || action.includes("clickable")) {
+		return `${base} bg-green-50 text-green-700 border-green-200`;
+	}
+	if (action === "suggest" || action.includes("suggest")) {
+		return `${base} bg-yellow-50 text-yellow-800 border-yellow-200`;
+	}
+	if (action === "update" || action.includes("update")) {
+		return `${base} bg-blue-50 text-blue-700 border-blue-200`;
+	}
+	return `${base} bg-slate-100 text-slate-700 border-slate-200`;
+}
+
 export default function HomePage() {
 	const [input, setInput] = useState<string>("<button><svg/></button>\n<img src=\"/x.png\"/>\n<a href=\"#\"></a>\n<div onClick={() => {}}/>\n<input />");
 	const [fixed, setFixed] = useState<string>("");
@@ -180,26 +194,25 @@ export default function HomePage() {
 										</Tabs.Content>
 
 										<Tabs.Content value="log" className="h-full outline-none">
-											<div className="h-full overflow-auto space-y-3">
+											<div className="h-full overflow-auto space-y-4">
 												{Object.keys(groupedLog).map((category) => (
-													<div key={category} className="rounded-lg border border-slate-200 bg-white shadow-sm">
-														<div className="flex items-center justify-between border-b bg-gray-50 px-3 py-2 text-sm font-medium rounded-t-lg">
-															<span>{category}</span>
-															<span className="inline-flex items-center rounded-full bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 text-[10px]">Fixed</span>
+													<div key={category}>
+														<div className="mb-2 flex items-center gap-2">
+															<h3 className="text-sm font-medium text-slate-700">{category}</h3>
+															<span className={badgeClassesForAction("add")}>Fixed</span>
 														</div>
-														<ul className="p-2 space-y-2 text-sm">
+														<div className="grid grid-cols-1 gap-3">
 															{groupedLog[category].map((item) => (
-																<li key={item.index} className="flex items-start justify-between gap-3">
-																	<div>
-																		<p className="text-gray-700">
-																			{item.summary}
-																			<span className="ml-2 inline-flex items-center rounded-full bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 text-[10px]">Fixed</span>
-																		</p>
-																		<p className="text-[11px] text-gray-500">{item.selector}</p>
+																<div key={item.index} className="rounded-lg border border-slate-200 bg-white shadow-sm p-3">
+																	<div className="mb-1 flex items-center justify-between">
+																		<span className="text-xs text-slate-500">{item.category}</span>
+																		<span className={badgeClassesForAction(item.action)}>{item.action === "suggest" ? "Suggested" : item.action === "update" ? "Updated" : "Fixed"}</span>
 																	</div>
+																	<p className="text-slate-800">{item.summary}</p>
+																	<p className="text-[11px] text-slate-500 mt-1">{item.selector}</p>
 																	{canRefine(item.action) && (
-																		<div className="flex items-center gap-2">
-																			<span className="inline-flex items-center rounded-full bg-yellow-50 text-yellow-800 border border-yellow-200 px-2 py-0.5 text-[10px]">Suggested</span>
+																		<div className="mt-2 flex items-center gap-2">
+																			<span className={badgeClassesForAction("suggest")}>Suggested</span>
 																			<button
 																				onClick={() => refineWithAI(item, item.index)}
 																				disabled={!!refining[item.index]}
@@ -209,15 +222,15 @@ export default function HomePage() {
 																			</button>
 																		</div>
 																	)}
-																</li>
+																</div>
 															))}
-														</ul>
+														</div>
 													</div>
-											))}
-										</div>
-									</Tabs.Content>
-								</div>
-							</Tabs.Root>
+												))}
+											</div>
+										</Tabs.Content>
+									</div>
+								</Tabs.Root>
 							)}
 						</div>
 					</section>
