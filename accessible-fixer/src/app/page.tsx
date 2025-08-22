@@ -2,8 +2,10 @@
 
 import { useCallback, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import * as Tabs from "@radix-ui/react-tabs";
 
 const ReactDiffViewer = dynamic(() => import("react-diff-viewer-continued"), { ssr: false });
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 type LogItem = { category: string; action: string; selector: string; summary: string };
 
@@ -12,6 +14,7 @@ type FixResponse = { code: string; log: LogItem[] } | { error: string };
 export default function HomePage() {
 	const [input, setInput] = useState<string>("<button><svg/></button>\n<img src=\"/x.png\"/>\n<a href=\"#\"></a>\n<div onClick={() => {}}/>\n<input />");
 	const [fixed, setFixed] = useState<string>("");
+	const [edited, setEdited] = useState<string>("");
 	const [log, setLog] = useState<LogItem[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -29,7 +32,9 @@ export default function HomePage() {
 			if (!res.ok || "error" in data) {
 				throw new Error((data as any).error || `Request failed with ${res.status}`);
 			}
-			setFixed((data as any).code || "");
+			const out = (data as any).code || "";
+			setFixed(out);
+			setEdited(out);
 			setLog((data as any).log || []);
 		} catch (e: any) {
 			setError(e?.message || "Unknown error");
@@ -38,16 +43,25 @@ export default function HomePage() {
 		}
 	}, [input]);
 
-	const hasResults = useMemo(() => fixed.length > 0 || log.length > 0, [fixed, log]);
+	const hasResults = useMemo(() => (fixed.length > 0 || log.length > 0), [fixed, log]);
+
+	const groupedLog = useMemo(() => {
+		const groups: Record<string, LogItem[]> = {};
+		for (const item of log) {
+			if (!groups[item.category]) groups[item.category] = [];
+			groups[item.category].push(item);
+		}
+		return groups;
+	}, [log]);
 
 	const copyFixed = useCallback(async () => {
 		try {
-			await navigator.clipboard.writeText(fixed);
+			await navigator.clipboard.writeText(edited);
 			alert("Copied fixed code to clipboard");
 		} catch {
 			alert("Failed to copy");
 		}
-	}, [fixed]);
+	}, [edited]);
 
 	return (
 		<main className="min-h-screen p-6">
@@ -84,18 +98,14 @@ export default function HomePage() {
 							{error && <p className="text-red-600">{error}</p>}
 							{!hasResults && !error && <p className="text-gray-500">No results yet.</p>}
 							{hasResults && (
-								<div className="space-y-6">
-									<div>
-										<div className="flex items-center justify-between mb-2">
-											<h3 className="font-medium">Fixed Code</h3>
-											<button onClick={copyFixed} className="rounded border px-2 py-1 text-xs hover:bg-gray-50">Copy</button>
-										</div>
-										<pre className="whitespace-pre-wrap break-words rounded bg-gray-50 p-3 border text-[13px]">
-											<code>{fixed}</code>
-										</pre>
-									</div>
-									<div>
-										<h3 className="font-medium mb-2">Diff</h3>
+								<Tabs.Root defaultValue="diff">
+									<Tabs.List className="mb-3 inline-flex rounded-md border bg-gray-50 p-1 text-sm">
+										<Tabs.Trigger value="diff" className="px-3 py-1.5 rounded data-[state=active]:bg-white data-[state=active]:shadow">Diff</Tabs.Trigger>
+										<Tabs.Trigger value="code" className="px-3 py-1.5 rounded data-[state=active]:bg-white data-[state=active]:shadow">Fixed Code</Tabs.Trigger>
+										<Tabs.Trigger value="log" className="px-3 py-1.5 rounded data-[state=active]:bg-white data-[state=active]:shadow">Change Log</Tabs.Trigger>
+									</Tabs.List>
+
+									<Tabs.Content value="diff" className="outline-none">
 										<div className="rounded border">
 											<ReactDiffViewer
 												oldValue={input}
@@ -105,19 +115,42 @@ export default function HomePage() {
 												rightTitle="After"
 											/>
 										</div>
-									</div>
-									<div>
-										<h3 className="font-medium mb-2">Changes</h3>
-										<ul className="space-y-2">
-											{log.map((item, idx) => (
-												<li key={idx} className="rounded border p-2">
-													<p className="text-xs text-gray-500">{item.category}</p>
-													<p className="text-sm">{item.summary}</p>
-												</li>
+									</Tabs.Content>
+
+									<Tabs.Content value="code" className="outline-none">
+										<div className="mb-2 flex items-center justify-between">
+											<h3 className="font-medium">Fixed Code (Editable)</h3>
+											<button onClick={copyFixed} className="rounded border px-2 py-1 text-xs hover:bg-gray-50">Copy</button>
+										</div>
+										<div className="h-[320px] rounded border">
+											<MonacoEditor
+												height="100%"
+												defaultLanguage="html"
+												value={edited}
+												onChange={(v) => setEdited(v || "")}
+												options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: "on" }}
+											/>
+										</div>
+									</Tabs.Content>
+
+									<Tabs.Content value="log" className="outline-none">
+										<div className="space-y-3">
+											{Object.keys(groupedLog).map((category) => (
+												<div key={category} className="rounded border">
+													<div className="border-b bg-gray-50 px-3 py-2 text-sm font-medium">{category}</div>
+													<ul className="p-2 space-y-2 text-sm">
+														{groupedLog[category].map((item, idx) => (
+															<li key={idx}>
+																<p className="text-gray-700">{item.summary}</p>
+																<p className="text-[11px] text-gray-500">{item.selector}</p>
+															</li>
+														))}
+													</ul>
+												</div>
 											))}
-										</ul>
-									</div>
-								</div>
+										</div>
+									</Tabs.Content>
+								</Tabs.Root>
 							)}
 						</div>
 					</section>
