@@ -106,7 +106,7 @@ export default function HomePage() {
 	}, [edited]);
 
 	return (
-		<main className="min-h-screen p-6">
+		<main className="min-h-screen p-6 bg-slate-50">
 			<div className="mx-auto max-w-6xl">
 				<h1 className="text-2xl font-semibold mb-6">Accessible Fixer</h1>
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -115,7 +115,7 @@ export default function HomePage() {
 						<label htmlFor="snippet" className="mb-2 text-sm font-medium text-gray-700">JSX/HTML Snippet</label>
 						<textarea
 							id="snippet"
-							className="min-h-[320px] w-full rounded-md border border-gray-300 p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+							className="min-h-[360px] w-full rounded-lg border border-slate-800 bg-slate-900 text-slate-100 caret-white shadow-sm p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 placeholder:text-slate-400"
 							placeholder="Paste JSX or HTML here..."
 							value={input}
 							onChange={(e) => setInput(e.target.value)}
@@ -136,19 +136,19 @@ export default function HomePage() {
 					</section>
 					<section aria-labelledby="results-label" className="flex flex-col">
 						<h2 id="results-label" className="mb-2 text-sm font-medium text-gray-700">Results</h2>
-						<div id="results" className="w-full rounded-md border border-dashed border-gray-300 p-3 text-sm">
+						<div id="results" className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-sm">
 							{error && <p className="text-red-600">{error}</p>}
 							{!hasResults && !error && <p className="text-gray-500">No results yet.</p>}
 							{hasResults && (
 								<Tabs.Root defaultValue="diff">
-									<Tabs.List className="mb-3 inline-flex rounded-md border bg-gray-50 p-1 text-sm">
+									<Tabs.List className="mb-3 inline-flex rounded-md border bg-gray-50 p-1 text-sm shadow-sm">
 										<Tabs.Trigger value="diff" className="px-3 py-1.5 rounded data-[state=active]:bg-white data-[state=active]:shadow">Diff</Tabs.Trigger>
 										<Tabs.Trigger value="code" className="px-3 py-1.5 rounded data-[state=active]:bg-white data-[state=active]:shadow">Fixed Code</Tabs.Trigger>
 										<Tabs.Trigger value="log" className="px-3 py-1.5 rounded data-[state=active]:bg-white data-[state=active]:shadow">Change Log</Tabs.Trigger>
 									</Tabs.List>
 
 									<Tabs.Content value="diff" className="outline-none">
-										<div className="rounded border">
+										<div className="rounded-lg border border-slate-200 bg-white shadow-sm">
 											<ReactDiffViewer
 												oldValue={input}
 												newValue={fixed}
@@ -164,7 +164,7 @@ export default function HomePage() {
 											<h3 className="font-medium">Fixed Code (Editable)</h3>
 											<button onClick={copyFixed} className="rounded border px-2 py-1 text-xs hover:bg-gray-50">Copy</button>
 										</div>
-										<div className="h-[320px] rounded border">
+										<div className="h-[360px] rounded-lg border border-slate-200 bg-white shadow-sm">
 											<MonacoEditor
 												height="100%"
 												defaultLanguage="html"
@@ -178,23 +178,32 @@ export default function HomePage() {
 									<Tabs.Content value="log" className="outline-none">
 										<div className="space-y-3">
 											{Object.keys(groupedLog).map((category) => (
-												<div key={category} className="rounded border">
-													<div className="border-b bg-gray-50 px-3 py-2 text-sm font-medium">{category}</div>
+												<div key={category} className="rounded-lg border border-slate-200 bg-white shadow-sm">
+													<div className="flex items-center justify-between border-b bg-gray-50 px-3 py-2 text-sm font-medium rounded-t-lg">
+														<span>{category}</span>
+														<span className="inline-flex items-center rounded-full bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 text-[10px]">Fixed</span>
+													</div>
 													<ul className="p-2 space-y-2 text-sm">
 														{groupedLog[category].map((item) => (
 															<li key={item.index} className="flex items-start justify-between gap-3">
 																<div>
-																	<p className="text-gray-700">{item.summary}</p>
+																	<p className="text-gray-700">
+																		{item.summary}
+																		<span className="ml-2 inline-flex items-center rounded-full bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 text-[10px]">Fixed</span>
+																	</p>
 																	<p className="text-[11px] text-gray-500">{item.selector}</p>
 																</div>
 																{canRefine(item.action) && (
-																	<button
-																		onClick={() => refineWithAI(item, item.index)}
-																		disabled={!!refining[item.index]}
-																		className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-50"
-																	>
-																	{refining[item.index] ? "Refining..." : "Refine with AI"}
-																	</button>
+																	<div className="flex items-center gap-2">
+																		<span className="inline-flex items-center rounded-full bg-yellow-50 text-yellow-800 border border-yellow-200 px-2 py-0.5 text-[10px]">Suggested</span>
+																		<button
+																			onClick={() => refineWithAI(item, item.index)}
+																			disabled={!!refining[item.index]}
+																			className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-50"
+																		>
+																			{refining[item.index] ? "Refining..." : "Refine with AI"}
+																		</button>
+																	</div>
 																)}
 															</li>
 														))}
