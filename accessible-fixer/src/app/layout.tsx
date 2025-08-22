@@ -12,6 +12,15 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<body className="min-h-screen">
+				<header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/70 backdrop-blur">
+					<div className="mx-auto max-w-6xl px-6 py-3 flex items-center justify-between">
+						<div className="flex items-center gap-2">
+							<div className="h-6 w-6 rounded bg-blue-600"></div>
+							<span className="font-semibold">Accessible Fixer</span>
+						</div>
+						<nav className="text-sm text-slate-600">Improve accessibility fast</nav>
+					</div>
+				</header>
 				{children}
 			</body>
 		</html>

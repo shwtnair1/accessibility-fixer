@@ -115,7 +115,7 @@ export default function HomePage() {
 						<label htmlFor="snippet" className="mb-2 text-sm font-medium text-gray-700">JSX/HTML Snippet</label>
 						<textarea
 							id="snippet"
-							className="min-h-[360px] w-full rounded-lg border border-slate-800 bg-slate-900 text-slate-100 caret-white shadow-sm p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 placeholder:text-slate-400"
+							className="min-h-[360px] w-full rounded-lg border border-slate-800 bg-slate-900 text-slate-100 caret-white shadow-sm p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 placeholder:text-slate-400 transition focus:shadow-md"
 							placeholder="Paste JSX or HTML here..."
 							value={input}
 							onChange={(e) => setInput(e.target.value)}
@@ -127,7 +127,7 @@ export default function HomePage() {
 								type="button"
 								disabled={loading}
 								onClick={handleFix}
-								className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+								className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white shadow hover:bg-blue-700 active:scale-[.99] focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition"
 								aria-controls="results"
 							>
 								{loading ? "Fixing..." : "Fix Accessibility"}
@@ -142,9 +142,9 @@ export default function HomePage() {
 							{hasResults && (
 								<Tabs.Root defaultValue="diff">
 									<Tabs.List className="mb-3 inline-flex rounded-md border bg-gray-50 p-1 text-sm shadow-sm">
-										<Tabs.Trigger value="diff" className="px-3 py-1.5 rounded data-[state=active]:bg-white data-[state=active]:shadow">Diff</Tabs.Trigger>
-										<Tabs.Trigger value="code" className="px-3 py-1.5 rounded data-[state=active]:bg-white data-[state=active]:shadow">Fixed Code</Tabs.Trigger>
-										<Tabs.Trigger value="log" className="px-3 py-1.5 rounded data-[state=active]:bg-white data-[state=active]:shadow">Change Log</Tabs.Trigger>
+										<Tabs.Trigger value="diff" className="px-3 py-1.5 rounded transition data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-slate-900 text-slate-600 hover:text-slate-900">Diff</Tabs.Trigger>
+										<Tabs.Trigger value="code" className="px-3 py-1.5 rounded transition data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-slate-900 text-slate-600 hover:text-slate-900">Fixed Code</Tabs.Trigger>
+										<Tabs.Trigger value="log" className="px-3 py-1.5 rounded transition data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-slate-900 text-slate-600 hover:text-slate-900">Change Log</Tabs.Trigger>
 									</Tabs.List>
 
 									<Tabs.Content value="diff" className="outline-none">
@@ -162,15 +162,16 @@ export default function HomePage() {
 									<Tabs.Content value="code" className="outline-none">
 										<div className="mb-2 flex items-center justify-between">
 											<h3 className="font-medium">Fixed Code (Editable)</h3>
-											<button onClick={copyFixed} className="rounded border px-2 py-1 text-xs hover:bg-gray-50">Copy</button>
+											<button onClick={copyFixed} className="rounded border px-2 py-1 text-xs hover:bg-gray-50 active:scale-[.99] transition">Copy</button>
 										</div>
-										<div className="h-[360px] rounded-lg border border-slate-200 bg-white shadow-sm">
+										<div className="h-[360px] rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
 											<MonacoEditor
 												height="100%"
 												defaultLanguage="html"
 												value={edited}
 												onChange={(v) => setEdited(v || "")}
-												options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: "on" }}
+												theme="vs-dark"
+												options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: "on", smoothScrolling: true, scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 } }}
 											/>
 										</div>
 									</Tabs.Content>
@@ -199,7 +200,7 @@ export default function HomePage() {
 																		<button
 																			onClick={() => refineWithAI(item, item.index)}
 																			disabled={!!refining[item.index]}
-																			className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-50"
+																			className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-gray-50 active:scale-[.99] disabled:opacity-50 transition"
 																		>
 																			{refining[item.index] ? "Refining..." : "Refine with AI"}
 																		</button>
